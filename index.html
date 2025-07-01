@@ -1,136 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Solana Token Info Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana Meme Token Info</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #0d0d0d;
-      color: #ffffff;
+      font-family: Arial, sans-serif;
+      background: #0d0d0d;
+      color: #fff;
       text-align: center;
       padding: 40px;
     }
-    input {
-      padding: 12px;
-      width: 340px;
-      border: none;
-      border-radius: 6px;
+    input, button {
+      padding: 10px;
       font-size: 16px;
+      border-radius: 5px;
+      margin: 5px;
+      border: none;
+    }
+    input {
+      width: 350px;
     }
     button {
-      padding: 12px 20px;
-      margin-left: 10px;
-      font-size: 16px;
       background-color: #00ff95;
-      border: none;
-      border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
     }
     .card {
       margin-top: 30px;
+      background: #1f1f1f;
       padding: 20px;
       border-radius: 10px;
-      background-color: #1e1e1e;
-      max-width: 500px;
-      margin-left: auto;
-      margin-right: auto;
+      display: inline-block;
       text-align: left;
     }
-    .card h2 {
-      color: #00ff95;
-      margin-bottom: 10px;
-    }
-    .card p {
-      margin: 6px 0;
-      font-size: 16px;
-    }
     .error {
-      margin-top: 20px;
       color: #ff4f4f;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
 
-  <h1>Solana Meme Coin Info</h1>
-  <p>Enter a SPL Token Mint Address:</p>
-  <input id="tokenAddress" value="2XYgocKz9MvkNVVyj85kdM2VxsUwrJeQUZVD4qmD4dYT">
-  <button onclick="fetchTokenInfo()">Get Info</button>
+  <h1>🪙 Solana Meme Token Info</h1>
+  <p>Enter token mint address:</p>
+  <input id="mintInput" value="2XYgocKz9MvkNVVyj85kdM2VxsUwrJeQUZVD4qmD4dYT">
+  <button onclick="fetchToken()">Fetch Info</button>
 
-  <div class="error" id="error"></div>
-
-  <div class="card" id="infoCard" style="display:none;">
-    <h2>Token Info</h2>
-    <p><strong>Mint Address:</strong> <span id="mint"></span></p>
-    <p><strong>Decimals:</strong> <span id="decimals"></span></p>
-    <p><strong>Total Supply:</strong> <span id="supply"></span></p>
-    <p><strong>Mint Authority:</strong> <span id="authority"></span></p>
+  <div class="card" id="resultCard" style="display:none;">
+    <p><strong>Mint Address:</strong> <span id="mintOut"></span></p>
+    <p><strong>Total Supply:</strong> <span id="supplyOut"></span></p>
+    <p><strong>Decimals:</strong> <span id="decimalsOut"></span></p>
+    <p><strong>Mint Authority:</strong> <span id="authorityOut"></span></p>
   </div>
 
+  <div class="error" id="errorBox"></div>
+
   <script>
-    async function fetchTokenInfo() {
-      const mintAddress = document.getElementById('tokenAddress').value.trim();
-      const errorBox = document.getElementById('error');
-      const card = document.getElementById('infoCard');
-      errorBox.innerText = "";
-      card.style.display = "none";
-
-      if (!mintAddress) {
-        errorBox.innerText = "⚠️ Please enter a token mint address.";
-        return;
+    const bs58encode = (bytes) => {
+      const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      let digits = [0];
+      for (let i = 0; i < bytes.length; ++i) {
+        let carry = bytes[i];
+        for (let j = 0; j < digits.length; ++j) {
+          carry += digits[j] << 8;
+          digits[j] = carry % 58;
+          carry = (carry / 58) | 0;
+        }
+        while (carry) {
+          digits.push(carry % 58);
+          carry = (carry / 58) | 0;
+        }
       }
+      for (let k = 0; k < bytes.length && bytes[k] === 0; ++k) {
+        digits.push(0);
+      }
+      return digits.reverse().map(d => ALPHABET[d]).join('');
+    };
 
-      const RPC = "https://api.mainnet-beta.solana.com";
+    async function fetchToken() {
+      const mint = document.getElementById('mintInput').value.trim();
+      const rpc = "https://api.mainnet-beta.solana.com";
+      const errorBox = document.getElementById("errorBox");
+      const resultCard = document.getElementById("resultCard");
+      errorBox.innerText = "";
+      resultCard.style.display = "none";
 
       try {
-        // Get token supply
-        const supplyRes = await fetch(RPC, {
+        // Get supply and decimals
+        const res1 = await fetch(rpc, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jsonrpc: "2.0",
             id: 1,
             method: "getTokenSupply",
-            params: [mintAddress]
+            params: [mint]
           })
         });
-        const supplyData = await supplyRes.json();
-        if (!supplyData.result) throw new Error("Token supply not found");
+        const json1 = await res1.json();
+        const supply = json1.result.value.uiAmountString;
+        const decimals = json1.result.value.decimals;
 
-        const supply = supplyData.result.value.uiAmountString;
-        const decimals = supplyData.result.value.decimals;
-
-        // Get mint authority from account info
-        const accountRes = await fetch(RPC, {
+        // Get base64 account data to parse mint authority
+        const res2 = await fetch(rpc, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             jsonrpc: "2.0",
             id: 1,
             method: "getAccountInfo",
-            params: [mintAddress, { encoding: "jsonParsed" }]
+            params: [mint, { encoding: "base64" }]
           })
         });
-        const accountData = await accountRes.json();
-        if (!accountData.result || !accountData.result.value) {
-          throw new Error("Mint account not found");
-        }
+        const json2 = await res2.json();
+        const b64 = json2.result.value?.data?.[0];
+        if (!b64) throw new Error("Invalid mint account.");
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const mintAuth = bs58encode(bytes.slice(0, 32));
 
-        const mintAuthority = accountData.result.value.data.parsed.info.mintAuthority || "None";
+        // Display result
+        document.getElementById("mintOut").innerText = mint;
+        document.getElementById("supplyOut").innerText = supply;
+        document.getElementById("decimalsOut").innerText = decimals;
+        document.getElementById("authorityOut").innerText = mintAuth;
+        resultCard.style.display = "block";
 
-        // Display UI
-        document.getElementById("mint").innerText = mintAddress;
-        document.getElementById("decimals").innerText = decimals;
-        document.getElementById("supply").innerText = supply;
-        document.getElementById("authority").innerText = mintAuthority;
-        card.style.display = "block";
-
-      } catch (err) {
-        errorBox.innerText = "❌ " + err.message;
-        console.error(err);
+      } catch (e) {
+        errorBox.innerText = "❌ " + e.message;
+        console.error(e);
       }
     }
   </script>

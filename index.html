@@ -2,75 +2,85 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Solana Token LP Checker</title>
+  <title>Solana Meme Coin Info</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: Arial; padding: 20px; background: #f7f7f7; }
-    input { padding: 10px; width: 400px; margin-right: 10px; }
-    button { padding: 10px 20px; }
-    pre { background: #eee; padding: 10px; border-radius: 5px; }
+    body {
+      font-family: Arial;
+      background: #121212;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+    }
+    input {
+      padding: 10px;
+      width: 300px;
+      border-radius: 5px;
+      border: none;
+    }
+    button {
+      padding: 10px 20px;
+      margin-left: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+      background: #00ff95;
+      border: none;
+      font-weight: bold;
+    }
+    .token-info {
+      margin-top: 30px;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+    img {
+      max-width: 80px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
+  <h1>Solana Meme Coin Info Tool</h1>
+  <p>Enter SPL Token Address:</p>
+  <input id="tokenAddress" placeholder="Paste token address here" />
+  <button onclick="getTokenInfo()">Fetch Info</button>
 
-  <h2>Solana Token Info + LP Burn Checker (Solscan API)</h2>
-
-  <input type="text" id="tokenAddress" placeholder="Enter token mint address">
-  <input type="text" id="lpTokenAddress" placeholder="Enter LP token address (optional)">
-  <button onclick="checkToken()">Check</button>
-
-  <h3>Result:</h3>
-  <pre id="output">Waiting...</pre>
+  <div class="token-info" id="result" style="display:none;">
+    <h2 id="tokenName"></h2>
+    <p><strong>Symbol:</strong> <span id="symbol"></span></p>
+    <p><strong>Supply:</strong> <span id="supply"></span></p>
+    <p><strong>Holders:</strong> <span id="holders"></span></p>
+    <img id="logo" src="" alt="Token Logo"/>
+  </div>
 
   <script>
-    async function fetchSolscan(endpoint) {
-      const res = await fetch(endpoint, {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-          "Accept": "application/json"
-        }
-      });
-      if (!res.ok) throw new Error("API error");
-      return res.json();
-    }
+    async function getTokenInfo() {
+      const address = document.getElementById('tokenAddress').value.trim();
+      if (!address) return alert("Enter a token address");
 
-    async function checkToken() {
-      const tokenMint = document.getElementById('tokenAddress').value.trim();
-      const lpToken = document.getElementById('lpTokenAddress').value.trim();
-      const output = document.getElementById('output');
+      const proxy = 'https://corsproxy.io/?';
+      const solscanURL = `https://public-api.solscan.io/token/meta?tokenAddress=${address}`;
 
       try {
-        // 1. Get token info
-        const tokenInfo = await fetchSolscan(`https://public-api.solscan.io/token/meta?tokenAddress=${tokenMint}`);
+        const res = await fetch(proxy + encodeURIComponent(solscanURL), {
+          headers: { 'accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error("Token not found or API issue");
 
-        // 2. Get token supply
-        const tokenSupply = await fetchSolscan(`https://public-api.solscan.io/token/supply?tokenAddress=${tokenMint}`);
+        const data = await res.json();
 
-        // 3. Get LP holder (optional)
-        let lpInfo = 'Not checked';
-        if (lpToken) {
-          const lpHolders = await fetchSolscan(`https://public-api.solscan.io/token/holders?tokenAddress=${lpToken}&limit=1`);
-          const topHolder = lpHolders?.data?.[0]?.owner;
-          if (topHolder === '11111111111111111111111111111111') {
-            lpInfo = '? LP Token is burned (sent to null address)';
-          } else {
-            lpInfo = `? LP Token is NOT burned\nTop LP Holder: ${topHolder}`;
-          }
-        }
+        document.getElementById("tokenName").textContent = data.name || "N/A";
+        document.getElementById("symbol").textContent = data.symbol || "N/A";
+        document.getElementById("supply").textContent = data.supply || "N/A";
+        document.getElementById("holders").textContent = data.holder || "N/A";
+        document.getElementById("logo").src = data.icon || "";
+        document.getElementById("result").style.display = "block";
 
-        output.textContent = `
-Token Name: ${tokenInfo.name}
-Symbol: ${tokenInfo.symbol}
-Decimals: ${tokenInfo.decimals}
-Mint Authority: ${tokenInfo?.tokenAuthority ?? 'None'}
-Total Supply: ${tokenSupply?.data?.supply / (10 ** tokenInfo.decimals)}
-
-LP Burn Status: ${lpInfo}
-        `.trim();
       } catch (err) {
-        output.textContent = '? Error: ' + err.message;
+        alert("Error: " + err.message);
       }
     }
   </script>
-
 </body>
 </html>

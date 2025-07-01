@@ -56,8 +56,8 @@
 <body>
 
   <h1>Solana Meme Coin Info</h1>
-  <p>Enter a SPL Token Mint Address below:</p>
-  <input id="tokenAddress" placeholder="Ex: So11111111111111111111111111111111111111112">
+  <p>Enter a SPL Token Mint Address:</p>
+  <input id="tokenAddress" value="2XYgocKz9MvkNVVyj85kdM2VxsUwrJeQUZVD4qmD4dYT">
   <button onclick="fetchTokenInfo()">Get Info</button>
 
   <div class="error" id="error"></div>
@@ -86,7 +86,7 @@
       const RPC = "https://api.mainnet-beta.solana.com";
 
       try {
-        // Get total supply and decimals
+        // Get token supply
         const supplyRes = await fetch(RPC, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -98,7 +98,7 @@
           })
         });
         const supplyData = await supplyRes.json();
-        if (!supplyData.result) throw new Error("Token supply data not found");
+        if (!supplyData.result) throw new Error("Token supply not found");
 
         const supply = supplyData.result.value.uiAmountString;
         const decimals = supplyData.result.value.decimals;
@@ -116,12 +116,12 @@
         });
         const accountData = await accountRes.json();
         if (!accountData.result || !accountData.result.value) {
-          throw new Error("Mint account data not found");
+          throw new Error("Mint account not found");
         }
 
         const mintAuthority = accountData.result.value.data.parsed.info.mintAuthority || "None";
 
-        // Show in UI
+        // Display UI
         document.getElementById("mint").innerText = mintAddress;
         document.getElementById("decimals").innerText = decimals;
         document.getElementById("supply").innerText = supply;

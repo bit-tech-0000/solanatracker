@@ -12,20 +12,19 @@
       padding: 20px;
       text-align: center;
     }
-    input {
+    input, button {
       padding: 10px;
-      width: 300px;
+      margin: 5px;
       border-radius: 5px;
       border: none;
     }
+    input {
+      width: 300px;
+    }
     button {
-      padding: 10px 20px;
-      margin-left: 10px;
-      cursor: pointer;
-      border-radius: 5px;
       background: #00ff95;
-      border: none;
       font-weight: bold;
+      cursor: pointer;
     }
     .token-info {
       margin-top: 30px;
@@ -34,51 +33,75 @@
       border-radius: 10px;
       display: inline-block;
     }
-    img {
-      max-width: 80px;
-      margin-top: 10px;
-    }
   </style>
 </head>
 <body>
-  <h1>Solana Meme Coin Info Tool</h1>
-  <p>Enter SPL Token Address:</p>
+  <h1>Solana Meme Coin Info (RPC Only)</h1>
+  <p>Enter SPL Token Mint Address:</p>
   <input id="tokenAddress" placeholder="Paste token address here" />
-  <button onclick="getTokenInfo()">Fetch Info</button>
+  <button onclick="fetchTokenInfo()">Fetch Info</button>
 
-  <div class="token-info" id="result" style="display:none;">
-    <h2 id="tokenName"></h2>
+  <div class="token-info" id="info" style="display:none;">
+    <h2 id="name"></h2>
     <p><strong>Symbol:</strong> <span id="symbol"></span></p>
-    <p><strong>Supply:</strong> <span id="supply"></span></p>
-    <p><strong>Holders:</strong> <span id="holders"></span></p>
-    <img id="logo" src="" alt="Token Logo"/>
+    <p><strong>Decimals:</strong> <span id="decimals"></span></p>
+    <p><strong>Total Supply:</strong> <span id="supply"></span></p>
+    <p><strong>Mint Authority:</strong> <span id="authority"></span></p>
   </div>
 
   <script>
-    async function getTokenInfo() {
-      const address = document.getElementById('tokenAddress').value.trim();
-      if (!address) return alert("Enter a token address");
+    async function fetchTokenInfo() {
+      const mintAddress = document.getElementById('tokenAddress').value.trim();
+      if (!mintAddress) return alert("Enter a token address");
 
-      const proxy = 'https://corsproxy.io/?';
-      const solscanURL = `https://public-api.solscan.io/token/meta?tokenAddress=${address}`;
+      const RPC = "https://api.mainnet-beta.solana.com";
 
       try {
-        const res = await fetch(proxy + encodeURIComponent(solscanURL), {
-          headers: { 'accept': 'application/json' }
+        // Get token supply
+        const supplyRes = await fetch(RPC, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getTokenSupply",
+            params: [mintAddress]
+          })
         });
-        if (!res.ok) throw new Error("Token not found or API issue");
+        const supplyData = await supplyRes.json();
+        const totalSupply = supplyData.result.value.uiAmountString;
 
-        const data = await res.json();
+        // Get token metadata from account
+        const metaRes = await fetch(RPC, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getAccountInfo",
+            params: [mintAddress, { encoding: "base64" }]
+          })
+        });
+        const metaData = atob(metaRes.result.value.data[0]);
 
-        document.getElementById("tokenName").textContent = data.name || "N/A";
-        document.getElementById("symbol").textContent = data.symbol || "N/A";
-        document.getElementById("supply").textContent = data.supply || "N/A";
-        document.getElementById("holders").textContent = data.holder || "N/A";
-        document.getElementById("logo").src = data.icon || "";
-        document.getElementById("result").style.display = "block";
+        const decimals = metaData.charCodeAt(44); // 45th byte = decimals
+        const authority = metaRes.result.value.owner;
+
+        // We'll fake a symbol and name for now (Solana doesn't store this on-chain)
+        const name = "Unknown Token";
+        const symbol = "???";
+
+        // Fill in UI
+        document.getElementById("name").innerText = name;
+        document.getElementById("symbol").innerText = symbol;
+        document.getElementById("decimals").innerText = decimals;
+        document.getElementById("supply").innerText = totalSupply;
+        document.getElementById("authority").innerText = authority;
+        document.getElementById("info").style.display = "block";
 
       } catch (err) {
         alert("Error: " + err.message);
+        console.error(err);
       }
     }
   </script>

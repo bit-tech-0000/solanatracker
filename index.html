@@ -1,16 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Solana Meme Token Info</title>
+  <title>Solana Meme Coin Info (Dexscreener)</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0d0d0d;
-      color: #fff;
-      text-align: center;
-      padding: 40px;
-    }
+    body { background: #0d0d0d; color: #fff; font-family: Arial; text-align: center; padding: 30px; }
     input, button {
       padding: 10px;
       font-size: 16px;
@@ -18,19 +12,17 @@
       margin: 5px;
       border: none;
     }
-    input {
-      width: 350px;
-    }
+    input { width: 350px; }
     button {
       background-color: #00ff95;
-      cursor: pointer;
       font-weight: bold;
+      cursor: pointer;
     }
     .card {
-      margin-top: 30px;
       background: #1f1f1f;
       padding: 20px;
       border-radius: 10px;
+      margin-top: 20px;
       display: inline-block;
       text-align: left;
     }
@@ -42,93 +34,52 @@
 </head>
 <body>
 
-  <h1>🪙 Solana Meme Token Info</h1>
-  <p>Enter token mint address:</p>
-  <input id="mintInput" value="2XYgocKz9MvkNVVyj85kdM2VxsUwrJeQUZVD4qmD4dYT">
-  <button onclick="fetchToken()">Fetch Info</button>
+  <h1>🪙 Solana Meme Coin Info (Dexscreener API)</h1>
 
-  <div class="card" id="resultCard" style="display:none;">
-    <p><strong>Mint Address:</strong> <span id="mintOut"></span></p>
-    <p><strong>Total Supply:</strong> <span id="supplyOut"></span></p>
-    <p><strong>Decimals:</strong> <span id="decimalsOut"></span></p>
-    <p><strong>Mint Authority:</strong> <span id="authorityOut"></span></p>
-  </div>
+  <input id="mintInput" placeholder="Enter token mint address" value="2XYgocKz9MvkNVVyj85kdM2VxsUwrJeQUZVD4qmD4dYT" />
+  <button onclick="fetchToken()">Fetch Info</button>
 
   <div class="error" id="errorBox"></div>
 
-  <script>
-    const bs58encode = (bytes) => {
-      const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-      let digits = [0];
-      for (let i = 0; i < bytes.length; ++i) {
-        let carry = bytes[i];
-        for (let j = 0; j < digits.length; ++j) {
-          carry += digits[j] << 8;
-          digits[j] = carry % 58;
-          carry = (carry / 58) | 0;
-        }
-        while (carry) {
-          digits.push(carry % 58);
-          carry = (carry / 58) | 0;
-        }
-      }
-      for (let k = 0; k < bytes.length && bytes[k] === 0; ++k) {
-        digits.push(0);
-      }
-      return digits.reverse().map(d => ALPHABET[d]).join('');
-    };
+  <div class="card" id="infoCard" style="display:none;">
+    <p><strong>Token:</strong> <span id="name"></span> (<span id="symbol"></span>)</p>
+    <p><strong>Price:</strong> $<span id="price"></span></p>
+    <p><strong>FDV:</strong> $<span id="fdv"></span></p>
+    <p><strong>Liquidity:</strong> $<span id="liquidity"></span></p>
+    <p><strong>Volume (24h):</strong> $<span id="volume"></span></p>
+    <p><strong>DEX:</strong> <span id="dex"></span></p>
+  </div>
 
+  <script>
     async function fetchToken() {
-      const mint = document.getElementById('mintInput').value.trim();
-      const rpc = "https://api.mainnet-beta.solana.com";
+      const mint = document.getElementById("mintInput").value.trim();
       const errorBox = document.getElementById("errorBox");
-      const resultCard = document.getElementById("resultCard");
+      const card = document.getElementById("infoCard");
+
       errorBox.innerText = "";
-      resultCard.style.display = "none";
+      card.style.display = "none";
 
       try {
-        // Get supply and decimals
-        const res1 = await fetch(rpc, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "getTokenSupply",
-            params: [mint]
-          })
-        });
-        const json1 = await res1.json();
-        const supply = json1.result.value.uiAmountString;
-        const decimals = json1.result.value.decimals;
+        const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`);
+        const data = await res.json();
 
-        // Get base64 account data to parse mint authority
-        const res2 = await fetch(rpc, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "getAccountInfo",
-            params: [mint, { encoding: "base64" }]
-          })
-        });
-        const json2 = await res2.json();
-        const b64 = json2.result.value?.data?.[0];
-        if (!b64) throw new Error("Invalid mint account.");
-        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        const mintAuth = bs58encode(bytes.slice(0, 32));
+        if (!data.pairs || data.pairs.length === 0) {
+          throw new Error("Token not found on Dexscreener");
+        }
 
-        // Display result
-        document.getElementById("mintOut").innerText = mint;
-        document.getElementById("supplyOut").innerText = supply;
-        document.getElementById("decimalsOut").innerText = decimals;
-        document.getElementById("authorityOut").innerText = mintAuth;
-        resultCard.style.display = "block";
+        const token = data.pairs[0];
+        document.getElementById("name").innerText = token.baseToken.name;
+        document.getElementById("symbol").innerText = token.baseToken.symbol;
+        document.getElementById("price").innerText = parseFloat(token.priceUsd).toFixed(8);
+        document.getElementById("fdv").innerText = token.fdv ? parseInt(token.fdv).toLocaleString() : "—";
+        document.getElementById("liquidity").innerText = token.liquidity.usd.toLocaleString();
+        document.getElementById("volume").innerText = token.volume.h24.toLocaleString();
+        document.getElementById("dex").innerText = token.dexId;
 
-      } catch (e) {
-        errorBox.innerText = "❌ " + e.message;
-        console.error(e);
+        card.style.display = "block";
+      } catch (err) {
+        errorBox.innerText = "❌ " + err.message;
+        console.error(err);
       }
     }
   </script>
